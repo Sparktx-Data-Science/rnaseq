@@ -1,0 +1,3 @@
+[submodule "differentialabundance"]
+	path = differentialabundance
+	url = https://github.com/Sparktx-Data-Science/differentialabundance
