@@ -176,7 +176,6 @@ process MakeRmdReport {
     path(reportscript)
     val(runid)
     path(multiqcreport)
-    val(urls)
 
     output:
     path("*.Rmd")
@@ -184,7 +183,7 @@ process MakeRmdReport {
     script:
     """
     export API_USER=\$RSTUDIO_CONNECT_API_USER && export API_KEY=\$RSTUDIO_CONNECT_API_KEY
-    publish_html.py --publicid "$params.run" --version "$params.VERSION" --runid $runid --report-script $reportscript --urls ${urls.join(" ")} --debug
+    publish_html.py --publicid "$params.run" --version "$params.VERSION" --runid $runid --report-script $reportscript --debug
     """
 }
 

@@ -64,7 +64,7 @@ with open('tmp.Rmd', 'w') as tmp:
     tmp.write('Workflow outputs at s3://sparkds-nextflow-outputs-production/bulk-rna-processing/%s/%s/\\\n' % (args.version, args.runid))
 
 deployproc = subprocess.run(['Rscript', args.report_script,
-        '--appname', 'scrnaseq_' + args.runid.replace('.', '_').replace('-', '_'), '--document', 'tmp.Rmd'], capture_output=True)
+        '--appname', 'rnaseq_' + args.runid.replace('.', '_').replace('-', '_'), '--document', 'tmp.Rmd'], capture_output=True)
 url = get_deployment_url(deployproc.stdout.decode())
 if not url:
     raise RuntimeError('Deployment failed for %s' % args.runid)
