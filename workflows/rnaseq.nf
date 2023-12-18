@@ -27,7 +27,7 @@ checkPathParamList = [
 for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
 
 // Check mandatory parameters
-if (params.input) { ch_input = file(params.input) } else { exit 1, 'Input samplesheet not specified!' }
+// if (params.input) { ch_input = file(params.input) } else { exit 1, 'Input samplesheet not specified!' }
 
 // Check rRNA databases for sortmerna
 if (params.remove_ribo_rna) {
@@ -101,6 +101,7 @@ include { DUPRADAR                           } from '../modules/local/dupradar'
 include { MULTIQC                            } from '../modules/local/multiqc'
 include { MULTIQC_CUSTOM_BIOTYPE             } from '../modules/local/multiqc_custom_biotype'
 include { UMITOOLS_PREPAREFORRSEM as UMITOOLS_PREPAREFORSALMON } from '../modules/local/umitools_prepareforrsem.nf'
+include { BuildSampleSheet  } from '../modules/local/buildsamplesheet'
 
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
@@ -158,6 +159,48 @@ def pass_mapped_reads  = [:]
 def pass_trimmed_reads = [:]
 def pass_strand_check  = [:]
 
+ch_unique_id = params.run_id ? params.run_id : workflow.sessionId
+params.outdir = "s3://sparkds-datalake-groupdropin-bioinformatics/scrnaseq/${params.unique_id}/"
+ch_report_template = Channel.fromPath("${projectDir}/templates/template_nextflow_report.Rmd")
+ch_html_publish_script = Channel.fromPath("${projectDir}/Rscripts/deploy_html.R")
+ch_sample_report_script = Channel.fromPath("${projectDir}/Rscripts/deploy_nextflow_sample.R")
+footer_ch = Channel.fromPath("${projectDir}/templates/footer.html")
+
+process MakeRmdReport {
+    secret 'RSTUDIO_CONNECT_API_USER'
+    secret 'RSTUDIO_CONNECT_API_KEY'
+    stageInMode 'copy'
+    container "125195589298.dkr.ecr.us-east-2.amazonaws.com/cbml-hd-short-read-report-runner:v0.1.3"
+
+    input:
+    path(reportscript)
+    val(runid)
+    path(multiqcreport)
+
+    output:
+    path("*.Rmd")
+
+    script:
+    """
+    export API_USER=\$RSTUDIO_CONNECT_API_USER && export API_KEY=\$RSTUDIO_CONNECT_API_KEY
+    publish_html.py --publicid "$params.run" --version "$params.VERSION" --runid $runid --report-script $reportscript --debug
+    """
+}
+
+process GetBucket {
+    input:
+    val(fastq)
+    container "125195589298.dkr.ecr.us-east-2.amazonaws.com/cbml-ubuntu:v2"
+
+    output:
+    stdout
+
+    script:
+    """
+    dirname ${fastq[0]} | tr -d '\\n'
+    """
+}
+
 workflow RNASEQ {
 
     ch_versions = Channel.empty()
@@ -198,6 +241,9 @@ workflow RNASEQ {
     //
     // SUBWORKFLOW: Read in samplesheet, validate and stage input files
     //
+    fastq_string_ch = Channel.fromList(params.reads).collect()
+    bucket_ch = GetBucket(fastq_string_ch)
+    ch_input = BuildSampleSheet(fastq_string_ch, bucket_ch)
     INPUT_CHECK (
         ch_input
     )
@@ -880,6 +926,7 @@ workflow RNASEQ {
             ch_tin_multiqc.collect{it[1]}.ifEmpty([])
         )
         multiqc_report = MULTIQC.out.report.toList()
+        ch_rmd_report = MakeRmdReport(ch_html_publish_script.first(), ch_unique_id, multiqc_report)
     }
 }
 
