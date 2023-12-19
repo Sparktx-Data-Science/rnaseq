@@ -2,7 +2,7 @@
 rnaseq:
   label: "Bulk RNA processing"
   version: "v1.0.0rc1"
-  description: "MultiQC and sample HTML reports"
+  description: "MultiQC and sample HTML report"
   workspace_id: "236559192150132"
   compute_env_id: "uEC2MMC1WSJaolYipyNpG"
   workspace_secrets:
