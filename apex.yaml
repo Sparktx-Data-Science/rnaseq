@@ -13,6 +13,8 @@ rnaseq:
   output_bucket: "sparkds-nextflow-outputs-production"
   default_parameters:
     aligner: "star_salmon"
+    strandedness: "auto"
+    skip_rseqc: true
   default_inputs:
     lot: ""
     run: ""
