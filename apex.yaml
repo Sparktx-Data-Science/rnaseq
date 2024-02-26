@@ -27,3 +27,5 @@ rnaseq:
     platform: ""
     requester: ""
     machine_id: ""
+  details:
+    is_multi_sample: true
