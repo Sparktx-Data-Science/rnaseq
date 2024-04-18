@@ -1,7 +1,7 @@
 ---
 rnaseq:
   label: "Bulk RNA processing"
-  version: "v1.0.0"
+  version: "v1.1.0"
   description: "MultiQC and sample HTML report"
   workspace_id: "115437722032750"
   compute_env_id: "1SepHXjkNIFllfRsNfVTsH"

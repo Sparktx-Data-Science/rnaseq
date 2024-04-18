@@ -147,6 +147,8 @@ include { BAM_DEDUP_STATS_SAMTOOLS_UMITOOLS as BAM_DEDUP_STATS_SAMTOOLS_UMITOOLS
 include { BEDGRAPH_BEDCLIP_BEDGRAPHTOBIGWIG as BEDGRAPH_BEDCLIP_BEDGRAPHTOBIGWIG_FORWARD } from '../subworkflows/nf-core/bedgraph_bedclip_bedgraphtobigwig/main'
 include { BEDGRAPH_BEDCLIP_BEDGRAPHTOBIGWIG as BEDGRAPH_BEDCLIP_BEDGRAPHTOBIGWIG_REVERSE } from '../subworkflows/nf-core/bedgraph_bedclip_bedgraphtobigwig/main'
 
+include { DIFFERENTIALABUNDANCE } from '../differentialabundance/workflows/differentialabundance'
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -165,6 +167,8 @@ ch_report_template = Channel.fromPath("${projectDir}/templates/template_nextflow
 ch_html_publish_script = Channel.fromPath("${projectDir}/Rscripts/deploy_html.R")
 ch_sample_report_script = Channel.fromPath("${projectDir}/Rscripts/deploy_nextflow_sample.R")
 footer_ch = Channel.fromPath("${projectDir}/templates/footer.html")
+params.samplesheet = ''
+params.contrasts = ''
 
 process MakeRmdReport {
     secret 'RSTUDIO_CONNECT_API_USER'
@@ -241,9 +245,19 @@ workflow RNASEQ {
     //
     // SUBWORKFLOW: Read in samplesheet, validate and stage input files
     //
-    fastq_string_ch = Channel.fromList(params.reads).collect()
-    bucket_ch = GetBucket(fastq_string_ch)
-    ch_input = BuildSampleSheet(fastq_string_ch, bucket_ch)
+    if( params.samplesheet ) {
+        if( !params.contrasts) {
+            error 'If providing samplesheet, also provide contrasts csv for differential abundance'
+        }
+        else {
+            ch_input = Channel.fromPath(params.samplesheet)
+        }
+    }
+    else {
+        fastq_string_ch = Channel.fromList(params.reads).collect()
+        bucket_ch = GetBucket(fastq_string_ch)
+        ch_input = BuildSampleSheet(fastq_string_ch, bucket_ch)
+    }
     INPUT_CHECK (
         ch_input
     )
@@ -529,6 +543,7 @@ workflow RNASEQ {
             true,
             params.salmon_quant_libtype ?: ''
         )
+        ch_matrix_flub = QUANTIFY_STAR_SALMON.out.counts_gene_length_scaled
         ch_versions = ch_versions.mix(QUANTIFY_STAR_SALMON.out.versions)
 
         if (!params.skip_qc & !params.skip_deseq2_qc) {
@@ -541,6 +556,10 @@ workflow RNASEQ {
             ch_aligner_clustering_multiqc = DESEQ2_QC_STAR_SALMON.out.dists_multiqc
             ch_versions = ch_versions.mix(DESEQ2_QC_STAR_SALMON.out.versions)
         }
+        if ( params.contrasts ) {
+            DIFFERENTIALABUNDANCE ( ch_matrix_flub )
+        }
+        //    DIFFERENTIALABUNDANCE ( '/home/ubuntu/git/rnaseq/salmon.merged.gene_counts_length_scaled.tsv' )
     }
 
     //
@@ -866,7 +885,9 @@ workflow RNASEQ {
             ch_pseudoaligner_pca_multiqc        = DESEQ2_QC_SALMON.out.pca_multiqc
             ch_pseudoaligner_clustering_multiqc = DESEQ2_QC_SALMON.out.dists_multiqc
             ch_versions = ch_versions.mix(DESEQ2_QC_SALMON.out.versions)
+
         }
+
     }
 
     //
@@ -928,6 +949,7 @@ workflow RNASEQ {
         multiqc_report = MULTIQC.out.report.toList()
         ch_rmd_report = MakeRmdReport(ch_html_publish_script.first(), ch_unique_id, multiqc_report)
     }
+
 }
 
 /*
